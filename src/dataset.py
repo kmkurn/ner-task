@@ -5,6 +5,8 @@ import os
 import random
 import sys
 
+from src.utils import TermDict
+
 
 class WordTagPair:
     __slots__ = ['word', 'tag']
@@ -36,6 +38,9 @@ class CoNLL:
         self._tag_index = defaultdict(list)
         if load:
             self.load()
+
+    def __iter__(self):
+        return iter(self._sentences)
 
     def load(self):
         self._sentences = []
@@ -70,6 +75,70 @@ class CoNLL:
 
     def sample_words(self, tag='O', size=10):
         return random.sample(self._tag_index[tag], size)
+
+
+class Vocabulary:
+    def __init__(self, unk_word_token=None, unk_tag_token=None):
+        self._word_dict = TermDict(unk_token=unk_word_token)
+        self._tag_dict = TermDict(unk_token=unk_tag_token)
+
+    def freeze(self):
+        self._word_dict.freeze()
+        self._tag_dict.freeze()
+
+    def get_word_id(self, word):
+        return self._word_dict.get_id(word)
+
+    def get_tag_id(self, tag):
+        return self._tag_dict.get_id(tag)
+
+    def get_word(self, word_id):
+        return self._word_dict.get_term(word_id)
+
+    def get_tag(self, tag_id):
+        return self._tag_dict.get_term(tag_id)
+
+    @property
+    def words(self):
+        return self._word_dict.terms
+
+    @property
+    def tags(self):
+        return self._tag_dict.terms
+
+
+class CoNLLDataset:
+    def __init__(self, train_conll, dev_conll):
+        self.train_conll = train_conll
+        self.dev_conll = dev_conll
+
+        self.fetch_all_sets()
+
+    def fetch_all_sets(self):
+        self._vocab = Vocabulary(unk_word_token='UNK')
+        self._X_train, self._y_train = self._fetch_from(self.train_conll)
+        self._vocab.freeze()
+        self._X_dev, self._y_dev = self._fetch_from(self.dev_conll)
+
+    def _fetch_from(self, conll):
+        wids, tids = [], []
+        for sent in conll:
+            for pair in sent:
+                wids.append(self._vocab.get_word_id(pair.word))
+                tids.append(self._vocab.get_tag_id(pair.tag))
+        return wids, tids
+
+    @property
+    def vocabulary(self):
+        return self._vocab
+
+    @property
+    def train_set(self):
+        return (self._X_train, self._y_train)
+
+    @property
+    def dev_set(self):
+        return (self._X_dev, self._y_dev)
 
 
 if __name__ == '__main__':
