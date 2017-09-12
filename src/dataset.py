@@ -16,6 +16,9 @@ class WordTagPair:
     def __str__(self):
         return f'{self.word}/{self.tag}'
 
+    def __repr__(self):
+        return f'{type(self).__name__}({self.word!r}, {self.tag!r})'
+
 
 class Sentence(list):
     def __str__(self):
