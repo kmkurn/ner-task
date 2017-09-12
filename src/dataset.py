@@ -7,6 +7,8 @@ import sys
 
 
 class WordTagPair:
+    __slots__ = ['word', 'tag']
+
     def __init__(self, word, tag):
         self.word = word
         self.tag = tag
