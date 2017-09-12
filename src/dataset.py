@@ -57,9 +57,7 @@ class CoNLL:
                 self._sentences.append(tmp)
 
     def summarize(self):
-        n_words = 0
-        for words in self._tag_index.values():
-            n_words += len(words)
+        n_words = sum(len(words) for words in self._tag_index.values())
 
         print('The corpus has:')
         print(f'{len(self._sentences)} sentences')
