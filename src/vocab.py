@@ -1,4 +1,4 @@
-from collections import namedtuple
+from collections import namedtuple, Counter
 import os
 
 from src.corpus import WordTagPair
@@ -9,7 +9,8 @@ WordTagIdPair = namedtuple('WordTagIdPair', ['word_id', 'tag_id'])
 
 
 class Vocabulary:
-    def __init__(self, unk_word_token=None, unk_tag_token=None):
+    def __init__(self, unk_word_token=None, unk_tag_token=None, min_word_count=1):
+        self.min_word_count = min_word_count
         self._word_dict = TermDict(unk_token=unk_word_token)
         self._tag_dict = TermDict(unk_token=unk_tag_token)
 
@@ -30,9 +31,12 @@ class Vocabulary:
         return self._tag_dict.get_term(tag_id)
 
     def fit(self, corpus):
+        words = tuple(zip(*corpus))[0]
+        self.counter = Counter(words)
         for pair in corpus:
-            self.get_word_id(pair.word)
-            self.get_tag_id(pair.tag)
+            if self.counter[pair.word] > self.min_word_count:
+                self.get_word_id(pair.word)
+                self.get_tag_id(pair.tag)
         self.freeze()
 
     def transform(self, corpus):
@@ -41,11 +45,6 @@ class Vocabulary:
             wid = self.get_word_id(pair.word)
             tid = self.get_tag_id(pair.tag)
             res.append(WordTagIdPair(wid, tid))
-        return res
-
-    def fit_transform(self, corpus):
-        res = self.transform(corpus)
-        self.freeze()
         return res
 
     def inverse_transform(self, corpus):
