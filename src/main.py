@@ -1,6 +1,6 @@
 from argparse import ArgumentParser
+import sys
 
-import numpy as np
 from sklearn.dummy import DummyClassifier
 from sklearn.externals import joblib
 
@@ -22,12 +22,21 @@ if __name__ == '__main__':
                         help='path to save/load the trained model')
     parser.add_argument('--strip-docstarts', action='store_true', default=True,
                         help='whether to strip -DOCSTART- elements (default: True)')
+    parser.add_argument('--min-count', '-c', default=1, type=int,
+                        help='min word count for rare words')
     args = parser.parse_args()
 
+    print('COMMAND:', ' '.join(sys.argv), file=sys.stderr)
     train_corpus = CoNLLCorpus(args.train_corpus, strip_docstarts=args.strip_docstarts)
+    print('Loaded training corpus', file=sys.stderr)
+    train_corpus.summarize(file=sys.stderr)
     dev_corpus = CoNLLCorpus(args.dev_corpus, strip_docstarts=args.strip_docstarts)
-    vocab = Vocabulary(unk_word_token='UNK')
-    train_corpus = vocab.fit_transform(train_corpus.flatten())
+    print('Loaded dev corpus', file=sys.stderr)
+    dev_corpus.summarize(file=sys.stderr)
+    vocab = Vocabulary(unk_word_token='UNK', min_word_count=args.min_count)
+    vocab.fit(train_corpus.flatten())
+    print(f'Built vocabulary containing {len(vocab.words)} word types', file=sys.stderr)
+    train_corpus = vocab.transform(train_corpus.flatten())
     dev_corpus = vocab.transform(dev_corpus.flatten())
 
     if args.model_name == 'majority':
@@ -40,10 +49,14 @@ if __name__ == '__main__':
     if args.mode == 'train':
         if args.model_name == 'majority':
             clf = DummyClassifier(strategy='most_frequent')
+        print('Training model...', end=' ', file=sys.stderr)
         clf.fit(train_set.inputs, train_set.targets)
+        print('done', file=sys.stderr)
         joblib.dump(clf, args.model_path)
+        print(f'Model saved to {args.model_path}', file=sys.stderr)
     else:
         clf = joblib.load(args.model_path)
+        print(f'Model loaded from {args.model_path}', file=sys.stderr)
         dev_outputs = clf.predict(dev_set.inputs)
         result = []
         for pair, output in zip(dev_corpus, dev_outputs):

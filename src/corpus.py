@@ -2,6 +2,7 @@ from argparse import ArgumentParser
 from collections import defaultdict, namedtuple
 import csv
 import random
+import sys
 
 
 WordTagPair = namedtuple('WordTagPair', ['word', 'tag'])
@@ -43,14 +44,17 @@ class CoNLLCorpus:
             if tmp_sent:
                 self._sentences.append(tmp_sent)
 
-    def summarize(self):
+    def summarize(self, file=None):
+        if file is None:
+            file = sys.stdout
+
         n_words = sum(len(words) for words in self._tag_index.values())
 
-        print('The corpus has:')
-        print(f'{len(self._sentences)} sentences')
-        print(f'{n_words} words')
+        print('The corpus has:', file=file)
+        print(f'{len(self._sentences)} sentences', file=file)
+        print(f'{n_words} word tokenss', file=file)
         for tag, words in self._tag_index.items():
-            print(f'{len(words)} words tagged with {tag}')
+            print(f'{len(words)} word tokens tagged with {tag}', file=file)
 
     def sample_sentences(self, size=10):
         return random.sample(self._sentences, size)
