@@ -1,3 +1,6 @@
+import numpy as np
+
+
 class TermDict:
     def __init__(self, unk_token=None):
         self.unk_token = unk_token
@@ -34,3 +37,14 @@ class TermDict:
     @property
     def terms(self):
         return self._term2id.keys()
+
+
+class Dataset:
+    def __init__(self, data):
+        self.data = data
+        self.inputs, self.targets = [], []
+        for pair in data:
+            self.inputs.append(pair[0])
+            self.targets.append(pair[1])
+        self.inputs = np.array(self.inputs)
+        self.targets = np.array(self.targets)
