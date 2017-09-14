@@ -6,8 +6,8 @@ from sklearn.externals import joblib
 
 from src.corpus import CoNLLCorpus
 from src.features import extract_dummy_features
-from src.vocab import Vocabulary, WordTagIdPair
-from src.utils import Dataset
+from src.vocab import Vocabulary
+from src.utils import Dataset, WordTagIdPair
 
 
 if __name__ == '__main__':
@@ -23,17 +23,17 @@ if __name__ == '__main__':
     parser.add_argument('--strip-docstarts', action='store_true', default=True,
                         help='whether to strip -DOCSTART- elements (default: True)')
     parser.add_argument('--min-count', '-c', default=1, type=int,
-                        help='min word count for rare words')
+                        help='min word count for rare words (default: 1)')
     args = parser.parse_args()
 
     print('COMMAND:', ' '.join(sys.argv), file=sys.stderr)
     train_corpus = CoNLLCorpus(args.train_corpus, strip_docstarts=args.strip_docstarts)
-    print('Loaded training corpus', file=sys.stderr)
+    print('Loaded training corpus.', file=sys.stderr, end=' ')
     train_corpus.summarize(file=sys.stderr)
     dev_corpus = CoNLLCorpus(args.dev_corpus, strip_docstarts=args.strip_docstarts)
-    print('Loaded dev corpus', file=sys.stderr)
+    print('Loaded dev corpus.', file=sys.stderr, end=' ')
     dev_corpus.summarize(file=sys.stderr)
-    vocab = Vocabulary(unk_word_token='UNK', min_word_count=args.min_count)
+    vocab = Vocabulary(unk_word_token='-UNK-', min_word_count=args.min_count)
     vocab.fit(train_corpus.flatten())
     print(f'Built vocabulary containing {len(vocab.words)} word types', file=sys.stderr)
     train_corpus = vocab.transform(train_corpus.flatten())
