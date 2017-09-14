@@ -69,15 +69,15 @@ if __name__ == '__main__':
                         choices=['summarize', 'sample', 'print'])
     parser.add_argument('corpus_file', help='path to corpus file')
     parser.add_argument('--strip-docstarts', action='store_true', default=True,
-                        help='whether to strip -DOCSTART- elements')
+                        help='whether to strip -DOCSTART- elements (default: True)')
     parser.add_argument('--sentence', '-s', action='store_true', default=True,
-                        help='sample sentences')
+                        help='sample sentences (default: True)')
     parser.add_argument('--words', '-w', action='store_true', help='sample words')
     parser.add_argument('--tag', '-t', default='O', choices=['O', 'MISC', 'ORG', 'PER', 'LOC'],
-                        help='sample only words with this tag')
-    parser.add_argument('--size', '-n', type=int, default=10, help='sample size')
+                        help='sample only words with this tag (default: O)')
+    parser.add_argument('--size', '-n', type=int, default=10, help='sample size (default: 10)')
     parser.add_argument('--strip-blank-lines', action='store_true', default=True,
-                        help='whether to strip blank lines when printing')
+                        help='whether to strip blank lines when printing (default: True)')
     args = parser.parse_args()
 
     corpus = CoNLLCorpus(args.corpus_file, strip_docstarts=args.strip_docstarts)
