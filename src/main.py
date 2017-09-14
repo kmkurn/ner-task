@@ -64,11 +64,8 @@ if __name__ == '__main__':
         train_hyps = [(vocab.get_word(wid), vocab.get_tag(output_tid))
                       for (wid, _), output_tid in zip(train_corpus, train_outputs)]
         train_refs = vocab.inverse_transform(train_corpus)
-        train_f1 = evaluate(train_refs, train_hyps, metric='f1')
-        print('* Training F1 scores:', file=sys.stderr)
-        for tag in sorted(train_f1.keys()):
-            f1_score = train_f1[tag]
-            print(f'    {tag}: {f1_score:.2f}', file=sys.stderr)
+        train_f1 = evaluate(train_refs, train_hyps, overall=True)[2]
+        print(f'* Training F1 score: {train_f1:.2f}', file=sys.stderr)
 
         joblib.dump(clf, args.model_path)
         print(f'* Model saved to {args.model_path}', file=sys.stderr)
@@ -79,11 +76,8 @@ if __name__ == '__main__':
         dev_hyps = [(vocab.get_word(wid), vocab.get_tag(output_tid))
                     for (wid, _), output_tid in zip(dev_corpus, dev_outputs)]
         dev_refs = vocab.inverse_transform(dev_corpus)
-        dev_f1 = evaluate(dev_refs, dev_hyps, metric='f1')
-        print('* Dev F1 scores:', file=sys.stderr)
-        for tag in sorted(dev_f1.keys()):
-            f1_score = dev_f1[tag]
-            print(f'    {tag}: {f1_score:.2f}', file=sys.stderr)
+        dev_f1 = evaluate(dev_refs, dev_hyps, overall=True)[2]
+        print(f'* Dev F1 scores: {dev_f1:.2f}', file=sys.stderr)
 
         result = []
         for (wid, tid), output_tid in zip(dev_corpus, dev_outputs):
