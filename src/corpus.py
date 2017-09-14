@@ -38,7 +38,7 @@ class CoNLLCorpus:
                     pair = WordTagPair(row[0], row[1])
                     self._tag_index[pair.tag].append(pair.word)
                     tmp_sent.append(pair)
-                else:
+                elif tmp_sent:
                     self._sentences.append(tmp_sent)
                     tmp_sent = []
             if tmp_sent:
