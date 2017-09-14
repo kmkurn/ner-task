@@ -1,11 +1,10 @@
 from argparse import ArgumentParser
-from collections import defaultdict, namedtuple
+from collections import defaultdict
 import csv
 import random
 import sys
 
-
-WordTagPair = namedtuple('WordTagPair', ['word', 'tag'])
+from src.utils import WordTagPair
 
 
 class CoNLLCorpus:

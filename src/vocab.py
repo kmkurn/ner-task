@@ -1,11 +1,7 @@
-from collections import namedtuple, Counter
+from collections import Counter
 import os
 
-from src.corpus import WordTagPair
-from src.utils import TermDict
-
-
-WordTagIdPair = namedtuple('WordTagIdPair', ['word_id', 'tag_id'])
+from src.utils import TermDict, WordTagIdPair, WordTagPair
 
 
 class Vocabulary:
@@ -13,10 +9,6 @@ class Vocabulary:
         self.min_word_count = min_word_count
         self._word_dict = TermDict(unk_token=unk_word_token)
         self._tag_dict = TermDict(unk_token=unk_tag_token)
-
-    def freeze(self):
-        self._word_dict.freeze()
-        self._tag_dict.freeze()
 
     def get_word_id(self, word):
         return self._word_dict.get_id(word)
@@ -31,37 +23,28 @@ class Vocabulary:
         return self._tag_dict.get_term(tag_id)
 
     def fit(self, corpus):
-        words = tuple(zip(*corpus))[0]
+        words, _ = tuple(zip(*corpus))
         self.counter = Counter(words)
         for pair in corpus:
             if self.counter[pair.word] > self.min_word_count:
-                self.get_word_id(pair.word)
-                self.get_tag_id(pair.tag)
-        self.freeze()
+                self._word_dict.add(pair.word)
+                self._tag_dict.add(pair.tag)
 
     def transform(self, corpus):
-        res = []
-        for pair in corpus:
-            wid = self.get_word_id(pair.word)
-            tid = self.get_tag_id(pair.tag)
-            res.append(WordTagIdPair(wid, tid))
-        return res
+        return [WordTagIdPair(self.get_word_id(pair.word), self.get_tag_id(pair.tag))
+                for pair in corpus]
 
     def inverse_transform(self, corpus):
-        res = []
-        for pair in corpus:
-            word = self.get_word(pair.word_id)
-            tag = self.get_tag(pair.tag_id)
-            res.append(WordTagPair(word, tag))
-        return res
+        return [WordTagPair(self.get_word(pair.word_id), self.get_tag(pair.tag_id))
+                for pair in corpus]
 
     def save_to_dir(self, output_dir):
         # Write word dict to file
-        with open(os.path.join(output_dir, 'words.tsv'), 'w') as f:
+        with open(os.path.join(output_dir, 'vocab-words.tsv'), 'w') as f:
             for word in self.words:
                 print(f'{word}\t{self.get_word_id(word)}', file=f)
         # Write tag dict to file
-        with open(os.path.join(output_dir, 'tags.tsv'), 'w') as f:
+        with open(os.path.join(output_dir, 'vocab-tags.tsv'), 'w') as f:
             for tag in self.tags:
                 print(f'{tag}\t{self.get_tag_id(tag)}', file=f)
 
