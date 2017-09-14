@@ -3,25 +3,20 @@ from collections import defaultdict
 import sys
 
 
-def evaluate(ref_path, hyp_path, metric='all', file=None):
+def evaluate(refs, hyps, metric='all', file=None):
     if metric not in ['all', 'precision', 'recall', 'f1']:
         raise ValueError(
             f"'metric' can only be 'all', 'precision', 'recall', or 'f1'; got '{metric}'")
 
-    with open(ref_path) as f:
-        ref_lines = [line.strip() for line in f if line.strip()]
-    with open(hyp_path) as f:
-        hyp_lines = [line.strip() for line in f if line.strip()]
-
-    if len(ref_lines) != len(hyp_lines):
+    if len(refs) != len(hyps):
         raise ValueError('reference and hypothesis has different number of lines')
 
     ref_count = defaultdict(int)
     hyp_count = defaultdict(int)
     true_pos = defaultdict(int)
-    for i, (ref_line, hyp_line) in enumerate(zip(ref_lines, hyp_lines)):
-        ref_word, ref_tag = ref_line.split()
-        hyp_word, hyp_tag = hyp_line.split()
+    for ref, hyp in zip(refs, hyps):
+        ref_word, ref_tag = ref
+        hyp_word, hyp_tag = hyp
 
         ref_count[ref_tag] += 1
         hyp_count[hyp_tag] += 1
@@ -56,7 +51,12 @@ if __name__ == '__main__':
                         default='all', help='metric to use in evaluation (default: all)')
     args = parser.parse_args()
 
-    result = evaluate(args.reference, args.hypothesis, metric=args.metric, file=sys.stderr)
+    with open(args.reference) as f:
+        refs = [(l.strip().split()[0], l.strip().split()[1]) for l in f if l.strip()]
+    with open(args.hypothesis) as f:
+        hyps = [(l.strip().split()[0], l.strip().split()[1]) for l in f if l.strip()]
+
+    result = evaluate(refs, hyps, metric=args.metric, file=sys.stderr)
     for tag, value in result.items():
         print(f'{tag}:', end=' ')
         if isinstance(value, tuple):

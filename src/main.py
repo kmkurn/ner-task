@@ -5,6 +5,7 @@ from sklearn.dummy import DummyClassifier
 from sklearn.externals import joblib
 
 from src.corpus import CoNLLCorpus
+from src.evaluation import evaluate
 from src.features import extract_dummy_features, extract_identity_features
 from src.models import MemorizeTrainingClassifier
 from src.vocab import Vocabulary
@@ -29,14 +30,14 @@ if __name__ == '__main__':
 
     print('COMMAND:', ' '.join(sys.argv), file=sys.stderr)
     train_corpus = CoNLLCorpus(args.train_corpus, strip_docstarts=args.strip_docstarts)
-    print('Loaded training corpus.', file=sys.stderr, end=' ')
+    print('* Loaded training corpus.', file=sys.stderr, end=' ')
     train_corpus.summarize(file=sys.stderr)
     dev_corpus = CoNLLCorpus(args.dev_corpus, strip_docstarts=args.strip_docstarts)
-    print('Loaded dev corpus.', file=sys.stderr, end=' ')
+    print('* Loaded dev corpus.', file=sys.stderr, end=' ')
     dev_corpus.summarize(file=sys.stderr)
     vocab = Vocabulary(unk_word_token='-UNK-', min_word_count=args.min_count)
     vocab.fit(train_corpus.flatten())
-    print(f'Built vocabulary containing {len(vocab.words)} word types', file=sys.stderr)
+    print(f'* Built vocabulary containing {len(vocab.words)} word types', file=sys.stderr)
     train_corpus = vocab.transform(train_corpus.flatten())
     dev_corpus = vocab.transform(dev_corpus.flatten())
 
@@ -55,14 +56,25 @@ if __name__ == '__main__':
             clf = DummyClassifier(strategy='most_frequent')
         else:
             clf = MemorizeTrainingClassifier()
-        print('Training model...', end=' ', file=sys.stderr)
+        print('* Training model...', end=' ', file=sys.stderr)
         clf.fit(train_set.inputs, train_set.targets)
         print('done', file=sys.stderr)
+
+        train_outputs = clf.predict(train_set.inputs)
+        train_hyps = [(vocab.get_word(pair.word_id), vocab.get_tag(tid))
+                      for pair, tid in zip(train_corpus, train_outputs)]
+        train_refs = [(vocab.get_word(pair.word_id), vocab.get_tag(pair.tag_id))
+                      for pair in train_corpus]
+        train_f1 = evaluate(train_refs, train_hyps, metric='f1')
+        print('* Training F1 scores:')
+        for tag, f1_score in train_f1.items():
+            print(f'    {tag}: {f1_score:.2f}')
+
         joblib.dump(clf, args.model_path)
-        print(f'Model saved to {args.model_path}', file=sys.stderr)
+        print(f'* Model saved to {args.model_path}', file=sys.stderr)
     else:
         clf = joblib.load(args.model_path)
-        print(f'Model loaded from {args.model_path}', file=sys.stderr)
+        print(f'* Model loaded from {args.model_path}', file=sys.stderr)
         dev_outputs = clf.predict(dev_set.inputs)
         result = []
         for pair, output in zip(dev_corpus, dev_outputs):
