@@ -51,7 +51,7 @@ class CoNLLCorpus:
 
         print('The corpus has:', file=file)
         print(f'{len(self._sentences)} sentences', file=file)
-        print(f'{n_words} word tokenss', file=file)
+        print(f'{n_words} word tokens', file=file)
         for tag, words in self._tag_index.items():
             print(f'{len(words)} word tokens tagged with {tag}', file=file)
 
