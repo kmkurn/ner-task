@@ -1,10 +1,4 @@
-from collections import namedtuple
-
 import numpy as np
-
-
-WordTagPair = namedtuple('WordTagPair', ['word', 'tag'])
-WordTagIdPair = namedtuple('WordTagIdPair', ['word_id', 'tag_id'])
 
 
 class TermDict:

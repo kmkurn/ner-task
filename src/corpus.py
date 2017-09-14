@@ -1,10 +1,7 @@
 from argparse import ArgumentParser
 from collections import defaultdict
-import csv
 import random
 import sys
-
-from src.utils import WordTagPair
 
 
 class CoNLLCorpus:
@@ -27,16 +24,16 @@ class CoNLLCorpus:
         self._sentences = []
         self._tag_index = defaultdict(list)
 
-        with open(self.corpus_path, newline='') as f:
-            reader = csv.reader(f, delimiter='\t', quoting=csv.QUOTE_NONE)
+        with open(self.corpus_path) as f:
             tmp_sent = []
-            for row in reader:
-                if row:
-                    if self.strip_docstarts and row[0] == self.DOCSTART_TOKEN:
+            for line in f:
+                line = line.strip()
+                if line:
+                    word, tag = line.split()
+                    if self.strip_docstarts and word == self.DOCSTART_TOKEN:
                         continue
-                    pair = WordTagPair(row[0], row[1])
-                    self._tag_index[pair.tag].append(pair.word)
-                    tmp_sent.append(pair)
+                    self._tag_index[tag].append(word)
+                    tmp_sent.append((word, tag))
                 elif tmp_sent:
                     self._sentences.append(tmp_sent)
                     tmp_sent = []
@@ -90,11 +87,11 @@ if __name__ == '__main__':
         else:
             for i, sent in enumerate(corpus.sample_sentences(size=args.size)):
                 print(f'{i+1})', end=' ')
-                print('  '.join([f'{pair.word}/{pair.tag}' for pair in sent]))
+                print('  '.join([f'{word}/{tag}' for word, tag in sent]))
     elif args.command == 'print':
         for sent in corpus:
-            for pair in sent:
-                print(f'{pair.word}\t{pair.tag}')
+            for word, tag in sent:
+                print(f'{word}\t{tag}')
             if not args.strip_blank_lines:
                 print()
     else:

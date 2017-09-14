@@ -1,6 +1,6 @@
 def extract_dummy_features(corpus):
-    return [((0, 0), pair.tag_id) for pair in corpus]
+    return [((0, 0), tid) for _, tid in corpus]
 
 
 def extract_identity_features(corpus):
-    return [((pair.word_id,), pair.tag_id) for pair in corpus]
+    return [((wid,), tid) for wid, tid in corpus]

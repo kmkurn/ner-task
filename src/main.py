@@ -9,7 +9,7 @@ from src.evaluation import evaluate
 from src.features import extract_dummy_features, extract_identity_features
 from src.models import MemorizeTrainingClassifier
 from src.vocab import Vocabulary
-from src.utils import Dataset, WordTagIdPair
+from src.utils import Dataset
 
 
 if __name__ == '__main__':
@@ -61,14 +61,14 @@ if __name__ == '__main__':
         print('done', file=sys.stderr)
 
         train_outputs = clf.predict(train_set.inputs)
-        train_hyps = [(vocab.get_word(pair.word_id), vocab.get_tag(tid))
-                      for pair, tid in zip(train_corpus, train_outputs)]
-        train_refs = [(vocab.get_word(pair.word_id), vocab.get_tag(pair.tag_id))
-                      for pair in train_corpus]
+        train_hyps = [(vocab.get_word(wid), vocab.get_tag(output_tid))
+                      for (wid, _), output_tid in zip(train_corpus, train_outputs)]
+        train_refs = vocab.inverse_transform(train_corpus)
         train_f1 = evaluate(train_refs, train_hyps, metric='f1')
-        print('* Training F1 scores:')
-        for tag, f1_score in train_f1.items():
-            print(f'    {tag}: {f1_score:.2f}')
+        print('* Training F1 scores:', file=sys.stderr)
+        for tag in sorted(train_f1.keys()):
+            f1_score = train_f1[tag]
+            print(f'    {tag}: {f1_score:.2f}', file=sys.stderr)
 
         joblib.dump(clf, args.model_path)
         print(f'* Model saved to {args.model_path}', file=sys.stderr)
@@ -76,9 +76,18 @@ if __name__ == '__main__':
         clf = joblib.load(args.model_path)
         print(f'* Model loaded from {args.model_path}', file=sys.stderr)
         dev_outputs = clf.predict(dev_set.inputs)
+        dev_hyps = [(vocab.get_word(wid), vocab.get_tag(output_tid))
+                    for (wid, _), output_tid in zip(dev_corpus, dev_outputs)]
+        dev_refs = vocab.inverse_transform(dev_corpus)
+        dev_f1 = evaluate(dev_refs, dev_hyps, metric='f1')
+        print('* Dev F1 scores:', file=sys.stderr)
+        for tag in sorted(dev_f1.keys()):
+            f1_score = dev_f1[tag]
+            print(f'    {tag}: {f1_score:.2f}', file=sys.stderr)
+
         result = []
-        for pair, output in zip(dev_corpus, dev_outputs):
-            result.append(WordTagIdPair(pair.word_id, output))
+        for (wid, tid), output_tid in zip(dev_corpus, dev_outputs):
+            result.append((wid, output_tid))
         result = vocab.inverse_transform(result)
-        for pair in result:
-            print(f'{pair.word}\t{pair.tag}')
+        for word, tag in result:
+            print(f'{word}\t{tag}')

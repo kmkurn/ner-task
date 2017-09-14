@@ -1,7 +1,7 @@
 from collections import Counter
 import os
 
-from src.utils import TermDict, WordTagIdPair, WordTagPair
+from src.utils import TermDict
 
 
 class Vocabulary:
@@ -25,18 +25,16 @@ class Vocabulary:
     def fit(self, corpus):
         words, _ = tuple(zip(*corpus))
         self.counter = Counter(words)
-        for pair in corpus:
-            if self.counter[pair.word] > self.min_word_count:
-                self._word_dict.add(pair.word)
-                self._tag_dict.add(pair.tag)
+        for word, tag in corpus:
+            if self.counter[word] > self.min_word_count:
+                self._word_dict.add(word)
+                self._tag_dict.add(tag)
 
     def transform(self, corpus):
-        return [WordTagIdPair(self.get_word_id(pair.word), self.get_tag_id(pair.tag))
-                for pair in corpus]
+        return [(self.get_word_id(word), self.get_tag_id(tag)) for word, tag in corpus]
 
     def inverse_transform(self, corpus):
-        return [WordTagPair(self.get_word(pair.word_id), self.get_tag(pair.tag_id))
-                for pair in corpus]
+        return [(self.get_word(wid), self.get_tag(tid)) for wid, tid in corpus]
 
     def save_to_dir(self, output_dir):
         # Write word dict to file

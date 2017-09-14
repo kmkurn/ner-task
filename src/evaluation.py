@@ -57,7 +57,8 @@ if __name__ == '__main__':
         hyps = [(l.strip().split()[0], l.strip().split()[1]) for l in f if l.strip()]
 
     result = evaluate(refs, hyps, metric=args.metric, file=sys.stderr)
-    for tag, value in result.items():
+    for tag in sorted(result.keys()):
+        value = result[tag]
         print(f'{tag}:', end=' ')
         if isinstance(value, tuple):
             print('prec={:.2f} recall={:.2f} f1={:.2f}'.format(*value))
