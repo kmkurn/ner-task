@@ -5,14 +5,15 @@ from sklearn.dummy import DummyClassifier
 from sklearn.externals import joblib
 
 from src.corpus import CoNLLCorpus
-from src.features import extract_dummy_features
+from src.features import extract_dummy_features, extract_identity_features
+from src.models import MemorizeTrainingClassifier
 from src.vocab import Vocabulary
 from src.utils import Dataset, WordTagIdPair
 
 
 if __name__ == '__main__':
     parser = ArgumentParser(description='The main script to run NER models')
-    parser.add_argument('--model-name', '-n', choices=['majority'], required=True,
+    parser.add_argument('--model-name', '-n', choices=['majority', 'memo'], required=True,
                         help='model name')
     parser.add_argument('--train-corpus', '-t', required=True, help='path to training corpus')
     parser.add_argument('--dev-corpus', '-d', required=True, help='path to dev corpus')
@@ -42,6 +43,9 @@ if __name__ == '__main__':
     if args.model_name == 'majority':
         train_data = extract_dummy_features(train_corpus)
         dev_data = extract_dummy_features(dev_corpus)
+    else:
+        train_data = extract_identity_features(train_corpus)
+        dev_data = extract_identity_features(dev_corpus)
 
     train_set = Dataset(train_data)
     dev_set = Dataset(dev_data)
@@ -49,6 +53,8 @@ if __name__ == '__main__':
     if args.mode == 'train':
         if args.model_name == 'majority':
             clf = DummyClassifier(strategy='most_frequent')
+        else:
+            clf = MemorizeTrainingClassifier()
         print('Training model...', end=' ', file=sys.stderr)
         clf.fit(train_set.inputs, train_set.targets)
         print('done', file=sys.stderr)
