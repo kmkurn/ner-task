@@ -3,19 +3,22 @@ import sys
 
 from sklearn.dummy import DummyClassifier
 from sklearn.externals import joblib
+from sklearn.linear_model import LogisticRegression
+from sklearn.pipeline import Pipeline
+from sklearn.preprocessing import StandardScaler
 
 from src.corpus import CoNLLCorpus
 from src.evaluation import evaluate
-from src.features import extract_dummy_features, extract_identity_features
+from src.features import (extract_dummy_features, extract_identity_features,
+                          extract_maxent_features)
 from src.models import MemorizeTrainingClassifier
 from src.vocab import Vocabulary
-from src.utils import Dataset
 
 
 if __name__ == '__main__':
     parser = ArgumentParser(description='The main script to run NER models')
-    parser.add_argument('--model-name', '-n', choices=['majority', 'memo'], required=True,
-                        help='model name')
+    parser.add_argument('--model-name', '-n', choices=['majority', 'memo', 'maxent'],
+                        required=True, help='model name')
     parser.add_argument('--train-corpus', '-t', required=True, help='path to training corpus')
     parser.add_argument('--dev-corpus', '-d', required=True, help='path to dev corpus')
     parser.add_argument('--mode', choices=['train', 'test'], default='train',
@@ -42,18 +45,22 @@ if __name__ == '__main__':
     dev_corpus = vocab.transform(dev_corpus.flatten())
 
     if args.model_name == 'majority':
-        train_data = extract_dummy_features(train_corpus)
-        dev_data = extract_dummy_features(dev_corpus)
+        train_set = extract_dummy_features(train_corpus)
+        dev_set = extract_dummy_features(dev_corpus)
+    elif args.model_name == 'maxent':
+        train_set = extract_maxent_features(train_corpus, vocab)
+        dev_set = extract_maxent_features(dev_corpus, vocab)
     else:
-        train_data = extract_identity_features(train_corpus)
-        dev_data = extract_identity_features(dev_corpus)
-
-    train_set = Dataset(train_data)
-    dev_set = Dataset(dev_data)
+        train_set = extract_identity_features(train_corpus)
+        dev_set = extract_identity_features(dev_corpus)
 
     if args.mode == 'train':
         if args.model_name == 'majority':
             clf = DummyClassifier(strategy='most_frequent')
+        elif args.model_name == 'maxent':
+            scaler = StandardScaler(with_mean=False)
+            logreg = LogisticRegression(multi_class='multinomial', solver='lbfgs')
+            clf = Pipeline([('scaler', scaler), ('logreg', logreg)])
         else:
             clf = MemorizeTrainingClassifier()
         print('* Training model...', end=' ', file=sys.stderr)
