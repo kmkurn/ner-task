@@ -2,15 +2,18 @@ from argparse import ArgumentParser
 import sys
 import pickle
 
+from nltk.classify.maxent import MaxentClassifier, TypedMaxentFeatureEncoding
+
 from src.corpus import CoNLLCorpus, DOCSTART_WORD, DOCSTART_TAG
 from src.evaluation import evaluate, pretty_format
-from src.featuresets import make_dummy_featuresets, make_word_featuresets
+from src.featuresets import (make_dummy_featuresets, make_word_featuresets,
+                             make_maxent_featuresets)
 from src.models import MajorityTag, MemoTraining
 
 
 if __name__ == '__main__':
     parser = ArgumentParser(description='The main script to run NER models')
-    parser.add_argument('--model-name', '-n', choices=['majority', 'memo'],
+    parser.add_argument('--model-name', '-n', choices=['majority', 'memo', 'maxent'],
                         required=True, help='model name')
     parser.add_argument('--corpus', '-c', required=True, help='path to corpus file')
     parser.add_argument('--model-path', '-m', required=True,
@@ -27,15 +30,17 @@ if __name__ == '__main__':
         print('* Loaded training corpus', file=sys.stderr, end='\n  ')
         print('\n  '.join(out), file=sys.stderr)
 
-        if args.model_name == 'memo':
-            cls = MemoTraining
-            train_toks = make_word_featuresets(train_corpus.reader)
-        else:
-            cls = MajorityTag
-            train_toks = make_dummy_featuresets(train_corpus.reader)
-
         print('* Training model...', end=' ', file=sys.stderr)
-        model = cls.train(train_toks)
+        if args.model_name == 'memo':
+            train_toks = make_word_featuresets(train_corpus.reader)
+            model = MemoTraining.train(train_toks)
+        elif args.model_name == 'maxent':
+            train_toks = make_maxent_featuresets(train_corpus.reader)
+            encoding = TypedMaxentFeatureEncoding.train(train_toks)
+            model = MaxentClassifier.train(train_toks, encoding=encoding, min_lldelta=0.001)
+        else:
+            train_toks = make_dummy_featuresets(train_corpus.reader)
+            model = MajorityTag.train(train_toks)
         print('done', file=sys.stderr)
 
         with open(args.model_path, 'wb') as f:

@@ -6,52 +6,48 @@ def make_word_featuresets(corpus_reader):
     return [({'word': word}, tag) for word, tag in corpus_reader.tagged_words()]
 
 
-# def extract_maxent_features(corpus, vocab):
-#     res = []
-#     tids = []
-#     for i, (wid, tid) in enumerate(corpus):
-#         tids.append(tid)
-#         features = {}
-#         word = vocab.get_word(wid)
-#         # Capitalization
-#         if _is_init_caps(word):
-#             features['initCaps'] = True
-#         elif word.isupper():
-#             features['allCaps'] = True
-#         elif any([c.isupper() for c in word[1:]]):
-#             features['mixedCaps'] = True
-#         # First word
-#         if i > 0 and corpus[i-1][0] == '.':
-#             if features.get('initCaps', False):
-#                 features['firstWord-initCaps'] = True
-#             else:
-#                 features['firstWord'] = True
-#         # Word length
-#         features['wordLen'] = len(word)
-#         # Punctuation
-#         if word[-1] == '.':
-#             features['endPeriod'] = True
-#         if '.' in word[:-1]:
-#             features['intPeriod'] = True
-#         if "'" in word:
-#             features['intQuote'] = True
-#         # Digits
-#         if word.isdigit():
-#             features['allDigits'] = True
-#         elif any([c.isdigit() for c in word]):
-#             features['intDigits'] = True
-#         # Contextual
-#         if i > 0 and corpus[i-1][0] in ['in', 'of']:
-#             features['w-1'] = corpus[i-1][0]
-#         if i + 1 < len(corpus) and corpus[i+1][0] in ['said', "'s"]:
-#             features['w+1'] = corpus[i+1][0]
-#         res.append(features)
-
-#     vec = DictVectorizer()
-#     return Dataset(inputs=vec.fit_transform(res), targets=np.array(tids))
+def make_maxent_featuresets(corpus_reader):
+    featuresets = []
+    tagged_words = corpus_reader.tagged_words()
+    for i, (word, tag) in enumerate(tagged_words):
+        fs = {}
+        # Capitalization
+        if _is_init_caps(word):
+            fs['initCaps'] = True
+        elif word.isupper():
+            fs['allCaps'] = True
+        elif any([c.isupper() for c in word[1:]]):
+            fs['mixedCaps'] = True
+        # First word
+        if i > 0 and tagged_words[i-1][0] == '.':
+            if fs.get('initCaps', False):
+                fs['firstWord-initCaps'] = True
+            else:
+                fs['firstWord'] = True
+        # Word length
+        fs['wordLen'] = len(word)
+        # Punctuation
+        if word[-1] == '.':
+            fs['endPeriod'] = True
+        if '.' in word[:-1]:
+            fs['intPeriod'] = True
+        if "'" in word:
+            fs['intQuote'] = True
+        # Digits
+        if word.isdigit():
+            fs['allDigits'] = True
+        elif any([c.isdigit() for c in word]):
+            fs['intDigits'] = True
+        # Contextual
+        if i > 0 and tagged_words[i-1][0] in ['in', 'of']:
+            fs['w-1'] = tagged_words[i-1][0]
+        if i + 1 < len(tagged_words) and tagged_words[i+1][0] in ['said', "'s"]:
+            fs['w+1'] = tagged_words[i+1][0]
+        featuresets.append((fs, tag))
+    return featuresets
 
 
-# def _is_init_caps(word):
-#     if not word:
-#         return False
-#     return word[0].isupper() and word[1:].islower()
+def _is_init_caps(word):
+    if not word:
+        return False
+    return word[0].isupper() and word[1:].islower()
