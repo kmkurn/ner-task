@@ -1,98 +1,93 @@
 from argparse import ArgumentParser
 from collections import defaultdict
+import os
 import random
-import sys
+
+from nltk.corpus.reader.tagged import TaggedCorpusReader
+from nltk.tokenize import RegexpTokenizer, BlanklineTokenizer
+
+
+DOCSTART_WORD = '-DOCSTART-'
+DOCSTART_TAG = 'O'
+
+
+def read_docstart_delimited_block(stream):
+    s = []
+    while True:
+        line = stream.readline()
+        # End of file:
+        if not line:
+            if s:
+                return [''.join(s)]
+            else:
+                return []
+        # DOCSTART line:
+        elif line.startswith(DOCSTART_WORD):
+            stream.readline()  # discard next line b/c it's blank
+            if s:
+                del s[-1]  # discard previous line b/c it's also blank
+                return [''.join(s)]
+        # Other line:
+        else:
+            s.append(line)
 
 
 class CoNLLCorpus:
-    DOCSTART_TOKEN = '-DOCSTART-'
-
-    def __init__(self, corpus_path, strip_docstarts=True):
+    def __init__(self, corpus_path):
         self.corpus_path = corpus_path
-        self.strip_docstarts = strip_docstarts
-        self._sentences = []
-        self._tag_index = defaultdict(list)
-        self.load()
+        corpus_dir, corpus_file = os.path.split(corpus_path)
+        self.reader = TaggedCorpusReader(
+            corpus_dir, [corpus_file], sep='\t',
+            word_tokenizer=RegexpTokenizer(r'\n', gaps=True),
+            sent_tokenizer=BlanklineTokenizer(),
+            para_block_reader=read_docstart_delimited_block)
 
-    def __iter__(self):
-        return iter(self._sentences)
+    def summarize(self):
+        n_paras = len(self.reader.paras())
+        n_sents = len(self.reader.sents())
+        n_words = len(self.reader.words())
+        counter = defaultdict(int)
+        for _, tag in self.reader.tagged_words():
+            counter[tag] += 1
 
-    def flatten(self):
-        return [pair for sent in self for pair in sent]
-
-    def load(self):
-        self._sentences = []
-        self._tag_index = defaultdict(list)
-
-        with open(self.corpus_path) as f:
-            tmp_sent = []
-            for line in f:
-                line = line.strip()
-                if line:
-                    word, tag = line.split()
-                    if self.strip_docstarts and word == self.DOCSTART_TOKEN:
-                        continue
-                    self._tag_index[tag].append(word)
-                    tmp_sent.append((word, tag))
-                elif tmp_sent:
-                    self._sentences.append(tmp_sent)
-                    tmp_sent = []
-            if tmp_sent:
-                self._sentences.append(tmp_sent)
-
-    def summarize(self, file=None):
-        if file is None:
-            file = sys.stdout
-
-        n_words = sum(len(words) for words in self._tag_index.values())
-
-        print('The corpus has:', file=file)
-        print(f'{len(self._sentences)} sentences', file=file)
-        print(f'{n_words} word tokens', file=file)
-        for tag, words in self._tag_index.items():
-            print(f'{len(words)} word tokens tagged with {tag}', file=file)
-
-    def sample_sentences(self, size=10):
-        return random.sample(self._sentences, size)
-
-    def sample_words(self, tag='O', size=10):
-        return random.sample(self._tag_index[tag], size)
+        out = [
+            f'{n_paras} paragraphs',
+            f'{n_sents} sentences',
+            f'{n_words} word tokens'
+        ]
+        for tag, counts in counter.items():
+            out.append(f'{counts} word tokens tagged with {tag}')
+        return '\n'.join(out)
 
 
 if __name__ == '__main__':
     parser = ArgumentParser(description='Script for interacting with the given CoNLL corpus')
     parser.add_argument('command', help='command to execute',
-                        choices=['summarize', 'sample', 'print'])
+                        choices=['summarize', 'sample'])
     parser.add_argument('corpus_file', help='path to corpus file')
-    parser.add_argument('--strip-docstarts', action='store_true', default=True,
-                        help='whether to strip -DOCSTART- elements (default: True)')
     parser.add_argument('--sentence', '-s', action='store_true', default=True,
                         help='sample sentences (default: True)')
     parser.add_argument('--words', '-w', action='store_true', help='sample words')
     parser.add_argument('--tag', '-t', default='O', choices=['O', 'MISC', 'ORG', 'PER', 'LOC'],
                         help='sample only words with this tag (default: O)')
     parser.add_argument('--size', '-n', type=int, default=10, help='sample size (default: 10)')
-    parser.add_argument('--strip-blank-lines', action='store_true', default=True,
-                        help='whether to strip blank lines when printing (default: True)')
     args = parser.parse_args()
 
-    corpus = CoNLLCorpus(args.corpus_file, strip_docstarts=args.strip_docstarts)
+    corpus = CoNLLCorpus(args.corpus_file)
 
     if args.command == 'sample':
         if args.words:
+            population = [word for word, tag_ in corpus.reader.tagged_words()
+                          if tag_ == args.tag]
             print(f'Words with {args.tag} tag:')
-            for i, word in enumerate(corpus.sample_words(tag=args.tag, size=args.size)):
+            for i, word in enumerate(random.sample(population, args.size)):
                 print(f'{i+1})', end=' ')
                 print(word)
         else:
-            for i, sent in enumerate(corpus.sample_sentences(size=args.size)):
+            population = list(corpus.reader.tagged_sents())
+            for i, sent in enumerate(random.sample(population, args.size)):
                 print(f'{i+1})', end=' ')
                 print('  '.join([f'{word}/{tag}' for word, tag in sent]))
-    elif args.command == 'print':
-        for sent in corpus:
-            for word, tag in sent:
-                print(f'{word}\t{tag}')
-            if not args.strip_blank_lines:
-                print()
     else:
-        corpus.summarize()
+        print('The corpus has:')
+        print(corpus.summarize())

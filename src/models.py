@@ -1,26 +1,42 @@
-import numpy as np
-from sklearn.base import BaseEstimator
+from collections import Counter
+
+from nltk.classify.api import ClassifierI
 
 
-class MemorizeTrainingClassifier(BaseEstimator):
-    def __init__(self):
-        self._memo = {}
+class MajorityTag(ClassifierI):
+    def __init__(self, majority_tag, tagset):
+        self.majority_tag = majority_tag
+        self.tagset = tagset
 
-    def fit(self, X, y):
-        for wid, tid in zip(X, y):
-            try:
-                wid = wid[0]
-            except TypeError:
-                pass  # wid is already an int/float
+    def labels(self):
+        return list(self.tagset)
 
-            self._memo[wid] = tid
+    def classify(self, featureset):
+        return self.majority_tag
 
-    def predict(self, X):
-        res = []
-        for wid in X:
-            try:
-                wid = wid[0]
-            except TypeError:
-                pass  # wid is already an int/float
-            res.append(self._memo[wid])
-        return np.array(res)
+    @classmethod
+    def train(cls, train_toks):
+        _, tags = tuple(zip(*train_toks))
+        c = Counter(tags)
+        return cls(c.most_common(1)[0][0], set(c.keys()))
+
+
+class MemoTraining(ClassifierI):
+    def __init__(self, memo, tagset):
+        self.memo = memo
+        self.tagset = tagset
+
+    def labels(self):
+        return list(self.tagset)
+
+    def classify(self, featureset):
+        return self.memo[featureset['word']]
+
+    @classmethod
+    def train(cls, train_toks):
+        memo = {}
+        tagset = set()
+        for featureset, tag in train_toks:
+            memo[featureset['word']] = tag
+            tagset.add(tag)
+        return cls(memo, tagset)

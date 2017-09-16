@@ -1,51 +1,81 @@
 from argparse import ArgumentParser
+from collections import defaultdict, Counter, namedtuple
 import sys
+from warnings import warn
 
-from sklearn.metrics import precision_score, recall_score, f1_score, confusion_matrix
+from nltk.metrics.scores import precision, recall, f_measure
+from nltk.metrics.confusionmatrix import ConfusionMatrix
+
+from src.corpus import CoNLLCorpus
 
 
-def evaluate(refs, hyps, file=None, overall=False):
-    if len(refs) != len(hyps):
+OVERALL_KEY = '-OVERALL-'
+EvalResult = namedtuple('EvalResult', ['precision', 'recall', 'f1', 'cm'])
+
+
+def evaluate(ref_tags, hyp_tags):
+    if len(ref_tags) != len(hyp_tags):
         raise ValueError('reference and hypothesis has different number of lines')
 
-    ref_words, ref_tags = tuple(zip(*refs))
-    hyp_words, hyp_tags = tuple(zip(*hyps))
+    n = len(ref_tags)
+    c = Counter(ref_tags)
+    unique_tags = sorted(set(ref_tags))
+    prec_dict, rec_dict, f_dict = defaultdict(float), defaultdict(float), defaultdict(float)
+    for tag in unique_tags:
+        ref_ids = {i for i, ref_tag in enumerate(ref_tags) if ref_tag == tag}
+        hyp_ids = {i for i, hyp_tag in enumerate(hyp_tags) if hyp_tag == tag}
+        prec_dict[tag] = precision(ref_ids, hyp_ids)
+        rec_dict[tag] = recall(ref_ids, hyp_ids)
+        f_dict[tag] = f_measure(ref_ids, hyp_ids)
+        if prec_dict[tag] is None:
+            warn(f'Undefined precision for {tag}; converting to 0.0')
+            prec_dict[tag] = 0.
+        if rec_dict[tag] is None:
+            warn(f'Undefined recall for {tag}; converting to 0.0')
+            rec_dict[tag] = 0.
+        if f_dict[tag] is None:
+            warn(f'Undefined F-score for {tag}; converting to 0.0')
+            f_dict[tag] = 0.
+        prec_dict[OVERALL_KEY] += c[tag] * prec_dict[tag] / n
+        rec_dict[OVERALL_KEY] += c[tag] * rec_dict[tag] / n
+        f_dict[OVERALL_KEY] += c[tag] * f_dict[tag] / n
 
-    for (ref_word, ref_tag), (hyp_word, hyp_tag) in zip(refs, hyps):
-        if ref_tag != hyp_tag and file is not None:
-            print(f'Wrong tag: {ref_word:20}\t{hyp_word:20}\t{ref_tag:5}\t{hyp_tag:5}',
-                  file=file)
+    return EvalResult(precision=prec_dict, recall=rec_dict, f1=f_dict,
+                      cm=ConfusionMatrix(ref_tags, hyp_tags, sort_by_count=True))
 
-    unique_tags = list(sorted(set(ref_tags)))
-    average = 'macro' if overall else None
-    precision = precision_score(ref_tags, hyp_tags, labels=unique_tags, average=average)
-    recall = recall_score(ref_tags, hyp_tags, labels=unique_tags, average=average)
-    f1 = f1_score(ref_tags, hyp_tags, labels=unique_tags, average=average)
-    cm = confusion_matrix(ref_tags, hyp_tags, labels=unique_tags)
 
-    if overall:
-        return precision, recall, f1
-    else:
-        return dict(zip(unique_tags, zip(precision, recall, f1))), cm
+def report_tag_mismatch(refs, hyps):
+    out = ['List of tag mismatch errors:']
+    for (ref_word, ref_tag), (_, hyp_tag) in zip(refs, hyps):
+        if ref_tag != hyp_tag:
+            out.append(f'{ref_word:25}\t{ref_tag:5}\t{hyp_tag:5}')
+    return '\n'.join(out)
+
+
+def pretty_format(result):
+    out = result.cm.pretty_format().split('\n')
+    for key in sorted(result.precision.keys()):
+        out.append('{:10}: prec={:.2f} recall={:.2f} f1={:.2f}'.format(
+            key, result.precision[key], result.recall[key], result.f1[key]))
+    return '\n'.join(out)
 
 
 if __name__ == '__main__':
     parser = ArgumentParser(description='Evaluate a hypothesis against a reference')
     parser.add_argument('reference', help='path to reference file')
     parser.add_argument('hypothesis', help='path to hypothesis file')
+    parser.add_argument('--verbose', '-v', action='store_true', default=False,
+                        help='whether to report tag mismatch errors to stderr')
     args = parser.parse_args()
 
-    with open(args.reference) as f:
-        refs = [(l.strip().split()[0], l.strip().split()[1]) for l in f if l.strip()]
-    with open(args.hypothesis) as f:
-        hyps = [(l.strip().split()[0], l.strip().split()[1]) for l in f if l.strip()]
+    ref_corpus = CoNLLCorpus(args.reference)
+    hyp_corpus = CoNLLCorpus(args.hypothesis)
 
-    result, cm = evaluate(refs, hyps, file=sys.stderr)
-    for tag in sorted(result.keys()):
-        value = result[tag]
-        print(f'{tag:5}:', end=' ')
-        if isinstance(value, tuple):
-            print('prec={:.2f} recall={:.2f} f1={:.2f}'.format(*value))
-        else:
-            print(f'{value:.2f}')
-    print(cm)
+    ref_tags = [tag for _, tag in ref_corpus.reader.tagged_words()]
+    hyp_tags = [tag for _, tag in hyp_corpus.reader.tagged_words()]
+    result = evaluate(ref_tags, hyp_tags)
+    print(pretty_format(result))
+
+    if args.verbose:
+        print(report_tag_mismatch(ref_corpus.reader.tagged_words(),
+                                  hyp_corpus.reader.tagged_words()), file=sys.stderr)

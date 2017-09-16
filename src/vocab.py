@@ -1,55 +1,50 @@
+from argparse import ArgumentParser
 from collections import Counter
-import os
 
-from src.utils import TermDict
+from src.corpus import DOCSTART_WORD, DOCSTART_TAG, CoNLLCorpus
 
 
 class Vocabulary:
-    def __init__(self, unk_word_token=None, unk_tag_token=None, min_word_count=1):
+    def __init__(self, unk_word_token, min_word_count=2):
+        self.unk_word_token = unk_word_token
         self.min_word_count = min_word_count
-        self._word_dict = TermDict(unk_token=unk_word_token)
-        self._tag_dict = TermDict(unk_token=unk_tag_token)
+        self.word_counts = {}
+        self.wordset = set()
+        self.tagset = set()
 
-    def get_word_id(self, word):
-        return self._word_dict.get_id(word)
+    def train(self, corpus_reader):
+        words, tags = tuple(zip(*corpus_reader.tagged_words()))
+        self.word_counts = Counter(words)
+        self.wordset = {word for word, count in self.word_counts.items()
+                        if count >= self.min_word_count}
+        self.tagset = set(tags)
 
-    def get_tag_id(self, tag):
-        return self._tag_dict.get_id(tag)
 
-    def get_word(self, word_id):
-        return self._word_dict.get_term(word_id)
+if __name__ == '__main__':
+    parser = ArgumentParser(description='Unkify words in a corpus given a training corpus')
+    parser.add_argument('train_file', help='path to training corpus')
+    parser.add_argument('corpus_file', help='path to corpus to be unkified')
+    parser.add_argument('--unk-token', '-u', default='-UNK-',
+                        help='special token for unknown words (default: -UNK-)')
+    parser.add_argument('--min-count', '-c', type=int, default=2,
+                        help='min count a word should have to be included in the vocabulary'
+                        ' (default: 2)')
+    args = parser.parse_args()
 
-    def get_tag(self, tag_id):
-        return self._tag_dict.get_term(tag_id)
+    train = CoNLLCorpus(args.train_file)
+    corpus = CoNLLCorpus(args.corpus_file)
+    vocab = Vocabulary(args.unk_token, min_word_count=args.min_count)
+    vocab.train(train.reader)
 
-    def fit(self, corpus):
-        words, _ = tuple(zip(*corpus))
-        self.counter = Counter(words)
-        for word, tag in corpus:
-            if self.counter[word] > self.min_word_count:
-                self._word_dict.add(word)
-                self._tag_dict.add(tag)
-
-    def transform(self, corpus):
-        return [(self.get_word_id(word), self.get_tag_id(tag)) for word, tag in corpus]
-
-    def inverse_transform(self, corpus):
-        return [(self.get_word(wid), self.get_tag(tid)) for wid, tid in corpus]
-
-    def save_to_dir(self, output_dir):
-        # Write word dict to file
-        with open(os.path.join(output_dir, 'vocab-words.tsv'), 'w') as f:
-            for word in self.words:
-                print(f'{word}\t{self.get_word_id(word)}', file=f)
-        # Write tag dict to file
-        with open(os.path.join(output_dir, 'vocab-tags.tsv'), 'w') as f:
-            for tag in self.tags:
-                print(f'{tag}\t{self.get_tag_id(tag)}', file=f)
-
-    @property
-    def words(self):
-        return self._word_dict.terms
-
-    @property
-    def tags(self):
-        return self._tag_dict.terms
+    out = []
+    for tagged_para in corpus.reader.tagged_paras():
+        out.append(f'{DOCSTART_WORD}\t{DOCSTART_TAG}')
+        out.append('')
+        for tagged_sent in tagged_para:
+            for word, tag in tagged_sent:
+                if word in vocab.wordset:
+                    out.append(f'{word}\t{tag}')
+                else:
+                    out.append(f'{args.unk_token}\t{tag}')
+            out.append('')
+    print('\n'.join(out))

@@ -1,94 +1,82 @@
 from argparse import ArgumentParser
 import sys
+import pickle
 
-from sklearn.dummy import DummyClassifier
-from sklearn.externals import joblib
-from sklearn.linear_model import LogisticRegression
-from sklearn.pipeline import Pipeline
-from sklearn.preprocessing import StandardScaler
-
-from src.corpus import CoNLLCorpus
-from src.evaluation import evaluate
-from src.features import (extract_dummy_features, extract_identity_features,
-                          extract_maxent_features)
-from src.models import MemorizeTrainingClassifier
-from src.vocab import Vocabulary
+from src.corpus import CoNLLCorpus, DOCSTART_WORD, DOCSTART_TAG
+from src.evaluation import evaluate, pretty_format
+from src.featuresets import make_dummy_featuresets, make_word_featuresets
+from src.models import MajorityTag, MemoTraining
 
 
 if __name__ == '__main__':
     parser = ArgumentParser(description='The main script to run NER models')
-    parser.add_argument('--model-name', '-n', choices=['majority', 'memo', 'maxent'],
+    parser.add_argument('--model-name', '-n', choices=['majority', 'memo'],
                         required=True, help='model name')
-    parser.add_argument('--train-corpus', '-t', required=True, help='path to training corpus')
-    parser.add_argument('--dev-corpus', '-d', required=True, help='path to dev corpus')
-    parser.add_argument('--mode', choices=['train', 'test'], default='train',
-                        help='whether to do training or testing/inference (default: train)')
+    parser.add_argument('--corpus', '-c', required=True, help='path to corpus file')
     parser.add_argument('--model-path', '-m', required=True,
                         help='path to save/load the trained model')
-    parser.add_argument('--strip-docstarts', action='store_true', default=True,
-                        help='whether to strip -DOCSTART- elements (default: True)')
-    parser.add_argument('--min-count', '-c', default=1, type=int,
-                        help='min word count for rare words (default: 1)')
+    parser.add_argument('--mode', choices=['train', 'test'], default='train',
+                        help='whether to do training or testing/inference (default: train)')
     args = parser.parse_args()
 
-    print('COMMAND:', ' '.join(sys.argv), file=sys.stderr)
-    train_corpus = CoNLLCorpus(args.train_corpus, strip_docstarts=args.strip_docstarts)
-    print('* Loaded training corpus.', file=sys.stderr, end=' ')
-    train_corpus.summarize(file=sys.stderr)
-    dev_corpus = CoNLLCorpus(args.dev_corpus, strip_docstarts=args.strip_docstarts)
-    print('* Loaded dev corpus.', file=sys.stderr, end=' ')
-    dev_corpus.summarize(file=sys.stderr)
-    vocab = Vocabulary(unk_word_token='-UNK-', min_word_count=args.min_count)
-    vocab.fit(train_corpus.flatten())
-    print(f'* Built vocabulary containing {len(vocab.words)} word types', file=sys.stderr)
-    train_corpus = vocab.transform(train_corpus.flatten())
-    dev_corpus = vocab.transform(dev_corpus.flatten())
-
-    if args.model_name == 'majority':
-        train_set = extract_dummy_features(train_corpus)
-        dev_set = extract_dummy_features(dev_corpus)
-    elif args.model_name == 'maxent':
-        train_set = extract_maxent_features(train_corpus, vocab)
-        dev_set = extract_maxent_features(dev_corpus, vocab)
-    else:
-        train_set = extract_identity_features(train_corpus)
-        dev_set = extract_identity_features(dev_corpus)
+    print('COMMAND:', ' '.join(sys.argv), file=sys.stderr, end='\n\n')
 
     if args.mode == 'train':
-        if args.model_name == 'majority':
-            clf = DummyClassifier(strategy='most_frequent')
-        elif args.model_name == 'maxent':
-            scaler = StandardScaler(with_mean=False)
-            logreg = LogisticRegression(multi_class='multinomial', solver='lbfgs')
-            clf = Pipeline([('scaler', scaler), ('logreg', logreg)])
+        train_corpus = CoNLLCorpus(args.corpus)
+        out = train_corpus.summarize().split('\n')
+        print('* Loaded training corpus', file=sys.stderr, end='\n  ')
+        print('\n  '.join(out), file=sys.stderr)
+
+        if args.model_name == 'memo':
+            cls = MemoTraining
+            train_toks = make_word_featuresets(train_corpus.reader)
         else:
-            clf = MemorizeTrainingClassifier()
+            cls = MajorityTag
+            train_toks = make_dummy_featuresets(train_corpus.reader)
+
         print('* Training model...', end=' ', file=sys.stderr)
-        clf.fit(train_set.inputs, train_set.targets)
+        model = cls.train(train_toks)
         print('done', file=sys.stderr)
 
-        train_outputs = clf.predict(train_set.inputs)
-        train_hyps = [(vocab.get_word(wid), vocab.get_tag(output_tid))
-                      for (wid, _), output_tid in zip(train_corpus, train_outputs)]
-        train_refs = vocab.inverse_transform(train_corpus)
-        train_f1 = evaluate(train_refs, train_hyps, overall=True)[2]
-        print(f'* Training F1 score: {train_f1:.2f}', file=sys.stderr)
-
-        joblib.dump(clf, args.model_path)
+        with open(args.model_path, 'wb') as f:
+            pickle.dump(model, f)
         print(f'* Model saved to {args.model_path}', file=sys.stderr)
-    else:
-        clf = joblib.load(args.model_path)
-        print(f'* Model loaded from {args.model_path}', file=sys.stderr)
-        dev_outputs = clf.predict(dev_set.inputs)
-        dev_hyps = [(vocab.get_word(wid), vocab.get_tag(output_tid))
-                    for (wid, _), output_tid in zip(dev_corpus, dev_outputs)]
-        dev_refs = vocab.inverse_transform(dev_corpus)
-        dev_f1 = evaluate(dev_refs, dev_hyps, overall=True)[2]
-        print(f'* Dev F1 scores: {dev_f1:.2f}', file=sys.stderr)
 
-        result = []
-        for (wid, tid), output_tid in zip(dev_corpus, dev_outputs):
-            result.append((wid, output_tid))
-        result = vocab.inverse_transform(result)
-        for word, tag in result:
-            print(f'{word}\t{tag}')
+        print(f'* Evaluate on training set:', file=sys.stderr)
+        train_featuresets = [fs for fs, _ in train_toks]
+        hyp_tags = model.classify_many(train_featuresets)
+        ref_tags = [tag for _, tag in train_corpus.reader.tagged_words()]
+        result = evaluate(ref_tags, hyp_tags)
+        print(pretty_format(result), file=sys.stderr)
+    else:
+        dev_corpus = CoNLLCorpus(args.corpus)
+        out = dev_corpus.summarize().split('\n')
+        print('* Loaded dev corpus', file=sys.stderr, end='\n  ')
+        print('\n  '.join(out), file=sys.stderr)
+
+        with open(args.model_path, 'rb') as f:
+            model = pickle.load(f)
+        print(f'* Model loaded from {args.model_path}', file=sys.stderr)
+        print(f'* Evaluate on dev set:', file=sys.stderr)
+        if args.model_name == 'memo':
+            featuresets = make_word_featuresets(dev_corpus.reader)
+        else:
+            featuresets = make_dummy_featuresets(dev_corpus.reader)
+        dev_featuresets = [fs for fs, _ in featuresets]
+        hyp_tags = model.classify_many(dev_featuresets)
+        ref_tags = [tag for _, tag in dev_corpus.reader.tagged_words()]
+        result = evaluate(ref_tags, hyp_tags)
+        print(pretty_format(result), file=sys.stderr)
+
+        # Print hyp corpus to stdout
+        out, i = [], 0
+        for para in dev_corpus.reader.paras():
+            out.append(f'{DOCSTART_WORD}\t{DOCSTART_TAG}')
+            out.append('')
+            for sent in para:
+                for word in sent:
+                    tag = hyp_tags[i]
+                    out.append(f'{word}\t{tag}')
+                    i += 1
+                out.append('')
+        print('\n'.join(out))
