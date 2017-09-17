@@ -20,6 +20,10 @@ if __name__ == '__main__':
                         help='path to save/load the trained model')
     parser.add_argument('--mode', choices=['train', 'test'], default='train',
                         help='whether to do training or testing/inference (default: train)')
+    parser.add_argument('--cutoff', type=int, default=2,
+                        help='feature count cutoff for maxent (default: 2)')
+    parser.add_argument('--max-iter', type=int, default=50,
+                        help='max number of training iteration for maxent')
     args = parser.parse_args()
 
     print('COMMAND:', ' '.join(sys.argv), file=sys.stderr, end='\n\n')
@@ -36,8 +40,10 @@ if __name__ == '__main__':
             model = MemoTraining.train(train_toks)
         elif args.model_name == 'maxent':
             train_toks = make_maxent_featuresets(train_corpus.reader)
-            encoding = TypedMaxentFeatureEncoding.train(train_toks)
-            model = MaxentClassifier.train(train_toks, encoding=encoding, min_lldelta=0.001)
+            encoding = TypedMaxentFeatureEncoding.train(train_toks, count_cutoff=args.cutoff,
+                                                        alwayson_features=True)
+            model = MaxentClassifier.train(train_toks, encoding=encoding,
+                                           max_iter=args.max_iter)
         else:
             train_toks = make_dummy_featuresets(train_corpus.reader)
             model = MajorityTag.train(train_toks)
@@ -65,6 +71,8 @@ if __name__ == '__main__':
         print(f'* Evaluate on dev set:', file=sys.stderr)
         if args.model_name == 'memo':
             featuresets = make_word_featuresets(dev_corpus.reader)
+        elif args.model_name == 'maxent':
+            featuresets = make_maxent_featuresets(dev_corpus.reader)
         else:
             featuresets = make_dummy_featuresets(dev_corpus.reader)
         dev_featuresets = [fs for fs, _ in featuresets]
