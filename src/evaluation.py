@@ -10,7 +10,7 @@ from src.corpus import CoNLLCorpus
 
 
 OVERALL_KEY = '-OVERALL-'
-EvalResult = namedtuple('EvalResult', ['precision', 'recall', 'f1', 'cm'])
+EvalResult = namedtuple('EvalResult', ['precision', 'recall', 'f1', 'conf_matrix'])
 
 
 def evaluate(ref_tags, hyp_tags):
@@ -18,10 +18,10 @@ def evaluate(ref_tags, hyp_tags):
         raise ValueError('reference and hypothesis has different number of lines')
 
     n = len(ref_tags)
-    c = Counter(ref_tags)
-    unique_tags = sorted(set(ref_tags))
+    counter = Counter(ref_tags)
+    unique_tags = set(ref_tags)
     prec_dict, rec_dict, f_dict = defaultdict(float), defaultdict(float), defaultdict(float)
-    for tag in unique_tags:
+    for tag in sorted(unique_tags):
         ref_ids = {i for i, ref_tag in enumerate(ref_tags) if ref_tag == tag}
         hyp_ids = {i for i, hyp_tag in enumerate(hyp_tags) if hyp_tag == tag}
         prec_dict[tag] = precision(ref_ids, hyp_ids)
@@ -36,27 +36,29 @@ def evaluate(ref_tags, hyp_tags):
         if f_dict[tag] is None:
             warn(f'Undefined F-score for {tag}; converting to 0.0')
             f_dict[tag] = 0.
-        prec_dict[OVERALL_KEY] += c[tag] * prec_dict[tag] / n
-        rec_dict[OVERALL_KEY] += c[tag] * rec_dict[tag] / n
-        f_dict[OVERALL_KEY] += c[tag] * f_dict[tag] / n
+        prec_dict[OVERALL_KEY] += counter[tag] * prec_dict[tag] / n
+        rec_dict[OVERALL_KEY] += counter[tag] * rec_dict[tag] / n
+        f_dict[OVERALL_KEY] += counter[tag] * f_dict[tag] / n
 
     return EvalResult(precision=prec_dict, recall=rec_dict, f1=f_dict,
-                      cm=ConfusionMatrix(ref_tags, hyp_tags, sort_by_count=True))
+                      conf_matrix=ConfusionMatrix(ref_tags, hyp_tags, sort_by_count=True))
 
 
 def report_tag_mismatch(refs, hyps):
     out = ['List of tag mismatch errors:']
+    max_len = max(len(word) for word, _ in refs)
+    fmt = f'{{:{max_len}}}\t{{}}\t{{}}'
     for (ref_word, ref_tag), (_, hyp_tag) in zip(refs, hyps):
         if ref_tag != hyp_tag:
-            out.append(f'{ref_word:25}\t{ref_tag:5}\t{hyp_tag:5}')
+            out.append(fmt.format(ref_word, ref_tag, hyp_tag))
     return '\n'.join(out)
 
 
 def pretty_format(result):
-    out = result.cm.pretty_format().split('\n')
+    out = result.conf_matrix.pretty_format().split('\n')
     for key in sorted(result.precision.keys()):
-        out.append('{:10}: prec={:.2f} recall={:.2f} f1={:.2f}'.format(
-            key, result.precision[key], result.recall[key], result.f1[key]))
+        out.append(f'{key:10}: prec={result.precision[key]:.2f} '
+                   'recall={result.recall[key]:.2f} f1={result.f1[key]:.2f}')
     return '\n'.join(out)
 
 
