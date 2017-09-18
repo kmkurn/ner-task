@@ -4,6 +4,7 @@ data/output/*
 !data/output/.gitkeep
 data/working/*
 !data/working/.gitkeep
+ipynb
 
 # Created by https://www.gitignore.io/api/python
 
