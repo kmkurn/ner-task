@@ -40,10 +40,10 @@ if __name__ == '__main__':
             model = MemoTraining.train(train_toks)
         elif args.model_name == 'maxent':
             train_toks = make_maxent_featuresets(train_corpus.reader)
-            encoding = TypedMaxentFeatureEncoding.train(train_toks, count_cutoff=args.cutoff,
-                                                        alwayson_features=True)
-            model = MaxentClassifier.train(train_toks, encoding=encoding,
-                                           max_iter=args.max_iter)
+            encoding = TypedMaxentFeatureEncoding.train(
+                train_toks, count_cutoff=args.cutoff, alwayson_features=True)
+            model = MaxentClassifier.train(
+                train_toks, encoding=encoding, max_iter=args.max_iter)
         else:
             train_toks = make_dummy_featuresets(train_corpus.reader)
             model = MajorityTag.train(train_toks)
