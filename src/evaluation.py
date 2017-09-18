@@ -57,8 +57,8 @@ def report_tag_mismatch(refs, hyps):
 def pretty_format(result):
     out = result.conf_matrix.pretty_format().split('\n')
     for key in sorted(result.precision.keys()):
-        out.append(f'{key:10}: prec={result.precision[key]:.2f} '
-                   'recall={result.recall[key]:.2f} f1={result.f1[key]:.2f}')
+        prec, rec, f1 = result.precision[key], result.recall[key], result.f1[key]
+        out.append(f'{key:10}: prec={prec:.2f} recall={rec:.2f} f1={f1:.2f}')
     return '\n'.join(out)
 
 
