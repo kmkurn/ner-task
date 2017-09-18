@@ -1,5 +1,5 @@
 from argparse import ArgumentParser
-from collections import defaultdict
+from collections import Counter
 import os
 import random
 
@@ -46,16 +46,14 @@ class CoNLLCorpus:
         n_paras = len(self.reader.paras())
         n_sents = len(self.reader.sents())
         n_words = len(self.reader.words())
-        counter = defaultdict(int)
-        for _, tag in self.reader.tagged_words():
-            counter[tag] += 1
+        counter = Counter([tag for _, tag in self.reader.tagged_words()])
 
         out = [
             f'{n_paras} paragraphs',
             f'{n_sents} sentences',
             f'{n_words} word tokens'
         ]
-        for tag, counts in counter.items():
+        for tag, counts in sorted(counter.items()):
             out.append(f'{counts} word tokens tagged with {tag}')
         return '\n'.join(out)
 
@@ -77,17 +75,16 @@ if __name__ == '__main__':
 
     if args.command == 'sample':
         if args.words:
-            population = [word for word, tag_ in corpus.reader.tagged_words()
-                          if tag_ == args.tag]
+            population = [word for word, tag in corpus.reader.tagged_words()
+                          if tag == args.tag]
             print(f'Words with {args.tag} tag:')
             for i, word in enumerate(random.sample(population, args.size)):
-                print(f'{i+1})', end=' ')
-                print(word)
+                print(f'{i+1}) {word}')
         else:
             population = list(corpus.reader.tagged_sents())
             for i, sent in enumerate(random.sample(population, args.size)):
-                print(f'{i+1})', end=' ')
-                print('  '.join([f'{word}/{tag}' for word, tag in sent]))
+                sent_str = '  '.join([f'{word}/{tag}' for word, tag in sent])
+                print(f'{i+1}) {sent_str}')
     else:
         print('The corpus has:')
         print(corpus.summarize())
