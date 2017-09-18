@@ -24,6 +24,9 @@ if __name__ == '__main__':
                         help='feature count cutoff for maxent (default: 2)')
     parser.add_argument('--max-iter', type=int, default=50,
                         help='max number of training iteration for maxent')
+    parser.add_argument('--contexts', type=int, nargs='*',
+                        help='contexts to include as features for maxent '
+                        '(default: -2 -1 0 1 2)')
     args = parser.parse_args()
 
     print('COMMAND:', ' '.join(sys.argv), file=sys.stderr, end='\n\n')
@@ -39,7 +42,8 @@ if __name__ == '__main__':
             train_toks = make_word_featuresets(train_corpus.reader)
             model = MemoTraining.train(train_toks)
         elif args.model_name == 'maxent':
-            train_toks = make_maxent_featuresets(train_corpus.reader)
+            contexts = args.contexts if args.contexts is not None else range(-2, 3)
+            train_toks = make_maxent_featuresets(train_corpus.reader, ds=contexts)
             encoding = TypedMaxentFeatureEncoding.train(
                 train_toks, count_cutoff=args.cutoff, alwayson_features=True)
             model = MaxentClassifier.train(
@@ -72,7 +76,8 @@ if __name__ == '__main__':
         if args.model_name == 'memo':
             featuresets = make_word_featuresets(dev_corpus.reader)
         elif args.model_name == 'maxent':
-            featuresets = make_maxent_featuresets(dev_corpus.reader)
+            contexts = args.contexts if args.contexts is not None else range(-2, 3)
+            featuresets = make_maxent_featuresets(dev_corpus.reader, ds=contexts)
         else:
             featuresets = make_dummy_featuresets(dev_corpus.reader)
         dev_featuresets = [fs for fs, _ in featuresets]

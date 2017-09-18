@@ -6,21 +6,20 @@ def make_word_featuresets(corpus_reader):
     return [({'word': word}, tag) for word, tag in corpus_reader.tagged_words()]
 
 
-def make_maxent_featuresets(corpus_reader):
+def make_maxent_featuresets(corpus_reader, ds=None):
+    if ds is None:
+        ds = range(-2, 3)
     featuresets = []
     tagged_words = corpus_reader.tagged_words()
     for i, (word, tag) in enumerate(tagged_words):
         fs = {}
-        # Lexical
-        fs['w'] = word
-        # Contextual
-        if i - 2 >= 0:
-            fs['w-2'] = tagged_words[i-2][0]
-        if i - 1 >= 0:
-            fs['w-1'] = tagged_words[i-1][0]
-        if i + 1 < len(tagged_words):
-            fs['w+1'] = tagged_words[i+1][0]
-        if i + 2 < len(tagged_words):
-            fs['w+2'] = tagged_words[i+2][0]
+        for d in ds:
+            if not d:
+                # Lexical
+                fs['w'] = word
+            elif i + d >= 0 and i + d < len(tagged_words):
+                # Contextual
+                key = f'w+{d}' if d > 0 else f'w{d}'
+                fs[key] = tagged_words[i+d][0]
         featuresets.append((fs, tag))
     return featuresets
