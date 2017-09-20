@@ -3,14 +3,18 @@ from collections import defaultdict, Counter, namedtuple
 import sys
 from warnings import warn
 
+import matplotlib.pyplot as plt
 from nltk.metrics.scores import precision, recall, f_measure
 from nltk.metrics.confusionmatrix import ConfusionMatrix
+import numpy as np
 
 from src.corpus import CoNLLCorpus
 
 
 OVERALL_KEY = '-OVERALL-'
 EvalResult = namedtuple('EvalResult', ['precision', 'recall', 'f1', 'conf_matrix'])
+
+plt.style.use('ggplot')
 
 
 def evaluate(ref_tags, hyp_tags):
@@ -62,12 +66,44 @@ def pretty_format(result):
     return '\n'.join(out)
 
 
+def plot_conf_matrix(conf_matrix, ref_tags, filename):
+    conf_arr = [[conf_matrix[t1, t2] for t2 in ref_tags] for t1 in ref_tags]
+    n = len(ref_tags)
+
+    norm_conf = []
+    for i in conf_arr:
+        tmp_arr = []
+        a = sum(i)
+        for j in i:
+            tmp_arr.append(j / a)
+        norm_conf.append(tmp_arr)
+
+    fig = plt.figure()
+    ax = fig.add_subplot(111)
+    ax.set_aspect(1)
+    ax.grid(False)
+    res = ax.imshow(np.array(norm_conf), cmap=plt.cm.jet,
+                    interpolation='nearest')
+
+    for x in range(n):
+        for y in range(n):
+            ax.annotate(str(conf_arr[x][y]), xy=(y, x),
+                        horizontalalignment='center',
+                        verticalalignment='center')
+
+    fig.colorbar(res)
+    plt.xticks(range(n), ref_tags)
+    plt.yticks(range(n), ref_tags)
+    plt.savefig(filename)
+
+
 if __name__ == '__main__':
     parser = ArgumentParser(description='Evaluate a hypothesis against a reference')
     parser.add_argument('reference', help='path to reference file')
     parser.add_argument('hypothesis', help='path to hypothesis file')
     parser.add_argument('--verbose', '-v', action='store_true', default=False,
                         help='whether to report tag mismatch errors to stderr')
+    parser.add_argument('--save-cm-to', help='plot confusion matrix and save it as this file')
     args = parser.parse_args()
 
     ref_corpus = CoNLLCorpus(args.reference)
@@ -81,3 +117,5 @@ if __name__ == '__main__':
     if args.verbose:
         print(report_tag_mismatch(ref_corpus.reader.tagged_words(),
                                   hyp_corpus.reader.tagged_words()), file=sys.stderr)
+    if args.save_cm_to is not None:
+        plot_conf_matrix(result.conf_matrix, sorted(set(ref_tags)), args.save_cm_to)
