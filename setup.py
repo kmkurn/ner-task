@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 
 setup(name='ner-task',
-      version='0.0.0',
+      version='1.0.0',
       author='Kemal Kurniawan',
       author_email='kemal@kkurniawan.com',
       license='MIT',
