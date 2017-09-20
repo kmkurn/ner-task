@@ -23,7 +23,7 @@ if __name__ == '__main__':
     parser.add_argument('--cutoff', type=int, default=2,
                         help='feature count cutoff for maxent (default: 2)')
     parser.add_argument('--max-iter', type=int, default=50,
-                        help='max number of training iteration for maxent')
+                        help='max number of training iteration for maxent (default: 50)')
     parser.add_argument('--contexts', type=int, nargs='*',
                         help='contexts to include as features for maxent '
                         '(default: -2 -1 0 1 2)')
